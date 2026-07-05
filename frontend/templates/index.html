@@ -1,0 +1,449 @@
+{% extends "layout.html" %}
+
+{% block title %}Smart File Duplicate Detector - Dashboard{% endblock %}
+
+{% block content %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        <div class="container mt-3">
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    <i class="bi {% if category == 'success' %}bi-check-circle{% elif category == 'danger' %}bi-exclamation-triangle{% else %}bi-info-circle{% endif %} me-2"></i>
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}
+
+{% if db_error %}
+<div class="container mt-3">
+    <div class="alert alert-danger d-flex align-items-center" role="alert">
+        <i class="bi bi-database-exclamation me-2 fs-4"></i>
+        <div>
+            <strong>Database Error:</strong> {{ db_error }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if not scan_result and active_page != 'about' %}
+<section class="hero-section text-center py-5">
+    <div class="container">
+        <div class="hero-icon mb-4">
+            <i class="bi bi-folder2-open"></i>
+        </div>
+        <h1 class="display-4 fw-bold text-primary mb-3">Find Duplicate Files in Seconds</h1>
+        <p class="lead text-muted mx-auto mb-4" style="max-width: 600px;">
+            Scan folders using SHA-256 hashing and identify duplicate files to save disk space. Fast, accurate, and free.
+        </p>
+        <div class="d-flex justify-content-center gap-3">
+            <a href="#scanner" class="btn btn-primary btn-lg px-4">
+                <i class="bi bi-search me-2"></i>Scan Folder
+            </a>
+            <a href="{{ url_for('history') }}" class="btn btn-outline-primary btn-lg px-4">
+                <i class="bi bi-clock-history me-2"></i>View History
+            </a>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<div class="container py-4">
+
+    {% if stats and not scan_result %}
+    <section id="dashboard">
+        <div class="row g-4 mb-5">
+            <div class="col-md-6 col-lg-3">
+                <div class="card stat-card border-0 shadow-sm h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="stat-icon bg-primary-subtle text-primary rounded-circle mx-auto mb-3">
+                            <i class="bi bi-folder-check"></i>
+                        </div>
+                        <h3 class="fw-bold mb-1">{{ stats.total_scans }}</h3>
+                        <p class="text-muted mb-0">Total Scans</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <div class="card stat-card border-0 shadow-sm h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="stat-icon bg-success-subtle text-success rounded-circle mx-auto mb-3">
+                            <i class="bi bi-files"></i>
+                        </div>
+                        <h3 class="fw-bold mb-1">{{ stats.total_files }}</h3>
+                        <p class="text-muted mb-0">Total Files Scanned</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <div class="card stat-card border-0 shadow-sm h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="stat-icon bg-warning-subtle text-warning rounded-circle mx-auto mb-3">
+                            <i class="bi bi-copy"></i>
+                        </div>
+                        <h3 class="fw-bold mb-1">{{ stats.duplicate_files }}</h3>
+                        <p class="text-muted mb-0">Duplicates Found</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <div class="card stat-card border-0 shadow-sm h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="stat-icon bg-danger-subtle text-danger rounded-circle mx-auto mb-3">
+                            <i class="bi bi-hdd-stack"></i>
+                        </div>
+                        <h3 class="fw-bold mb-1">{{ stats.total_space_saved }}</h3>
+                        <p class="text-muted mb-0">Storage Saved</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if stats.recent_scan %}
+        <div class="card border-0 shadow-sm mb-5">
+            <div class="card-header bg-white border-bottom d-flex align-items-center">
+                <i class="bi bi-clock-history me-2 text-primary fs-5"></i>
+                <h5 class="mb-0 fw-semibold">Recent Scan</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <small class="text-muted d-block">Folder</small>
+                        <span class="fw-medium">{{ stats.recent_scan.folder_path }}</span>
+                    </div>
+                    <div class="col-sm-3">
+                        <small class="text-muted d-block">Files Scanned</small>
+                        <span class="fw-medium">{{ stats.recent_scan.total_files }}</span>
+                    </div>
+                    <div class="col-sm-3">
+                        <small class="text-muted d-block">Duplicates</small>
+                        <span class="fw-medium">{{ stats.recent_scan.duplicate_files }}</span>
+                    </div>
+                </div>
+                <hr class="my-2">
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <small class="text-muted d-block">Date</small>
+                        <span class="fw-medium">{{ stats.recent_scan.scan_date }}</span>
+                    </div>
+                    <div class="col-sm-6">
+                        <small class="text-muted d-block">Space Saved</small>
+                        <span class="fw-medium text-success">{{ stats.recent_scan.space_saved }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% if active_page != 'about' %}
+    <section id="scanner" class="mb-5">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3">
+                <h5 class="mb-0 fw-semibold">
+                    <i class="bi bi-search me-2 text-primary"></i>Scan a Folder
+                </h5>
+            </div>
+            <div class="card-body p-4">
+                <form id="scanForm" action="{{ url_for('scan') }}" method="POST">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-8">
+                            <label for="folderPath" class="form-label fw-medium">Folder Path</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light">
+                                    <i class="bi bi-folder"></i>
+                                </span>
+                                <input type="text" class="form-control form-control-lg" id="folderPath"
+                                       name="folder_path" placeholder="C:\Users\Pavan\Downloads"
+                                       value="{{ scan_result.folder_path if scan_result else '' }}" required>
+                            </div>
+                            <div class="form-text">Enter the full path of the folder you want to scan.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-primary btn-lg w-100" id="scanBtn">
+                                <i class="bi bi-play-fill me-1"></i>Start Scan
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <div id="scanProgress" class="mt-4 d-none">
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                            <span class="visually-hidden">Scanning...</span>
+                        </div>
+                        <span class="fw-medium" id="scanStatus">Scanning folder...</span>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                             role="progressbar" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if scan_result %}
+    <section id="results" class="mb-5">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3">
+                <h5 class="mb-0 fw-semibold">
+                    <i class="bi bi-clipboard-data me-2 text-primary"></i>Scan Summary
+                </h5>
+                <span class="badge {% if scan_result.duplicate_files > 0 %}bg-warning text-dark{% else %}bg-success{% endif %} fs-6">
+                    {% if scan_result.duplicate_files > 0 %}
+                        <i class="bi bi-exclamation-triangle me-1"></i>{{ scan_result.duplicate_files }} duplicate(s) found
+                    {% else %}
+                        <i class="bi bi-check-circle me-1"></i>No duplicates found
+                    {% endif %}
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-sm-6 col-lg-3">
+                        <div class="text-center p-3 bg-light rounded-3">
+                            <small class="text-muted d-block">Folder Scanned</small>
+                            <span class="fw-semibold text-truncate d-block" title="{{ scan_result.folder_path }}">
+                                {{ scan_result.folder_path }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-lg-3">
+                        <div class="text-center p-3 bg-light rounded-3">
+                            <small class="text-muted d-block">Total Files</small>
+                            <span class="fw-bold fs-4 text-primary">{{ scan_result.total_files }}</span>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-lg-3">
+                        <div class="text-center p-3 bg-light rounded-3">
+                            <small class="text-muted d-block">Duplicate Files</small>
+                            <span class="fw-bold fs-4 {% if scan_result.duplicate_files > 0 %}text-warning{% else %}text-success{% endif %}">
+                                {{ scan_result.duplicate_files }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-lg-3">
+                        <div class="text-center p-3 bg-light rounded-3">
+                            <small class="text-muted d-block">Space Can Be Saved</small>
+                            <span class="fw-bold fs-4 text-danger">{{ scan_result.space_saved_display }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% if scan_result.scan_time %}
+                <div class="text-center mt-3">
+                    <small class="text-muted">
+                        <i class="bi bi-clock me-1"></i>Scan completed in {{ scan_result.scan_time }} seconds
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if scan_result.duplicate_files > 0 %}
+        <div class="alert alert-warning d-flex align-items-center" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+            <div>
+                <strong>Duplicate files detected!</strong> Found {{ scan_result.duplicate_files }} duplicate files
+                occupying approximately <strong>{{ scan_result.space_saved_display }}</strong> of disk space.
+            </div>
+        </div>
+        {% elif scan_result.total_files == 0 %}
+        <div class="alert alert-info d-flex align-items-center" role="alert">
+            <i class="bi bi-info-circle-fill me-2 fs-5"></i>
+            <div>{{ scan_result.message or 'No files found in the selected folder.' }}</div>
+        </div>
+        {% else %}
+        <div class="alert alert-success d-flex align-items-center" role="alert">
+            <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+            <div><strong>No duplicate files found!</strong> All files in this folder are unique.</div>
+        </div>
+        {% endif %}
+
+        {% if scan_result.duplicate_groups and scan_result.duplicate_groups|length > 0 %}
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3">
+                <h5 class="mb-0 fw-semibold">
+                    <i class="bi bi-files me-2 text-primary"></i>Duplicate Groups
+                    <span class="badge bg-primary ms-2">{{ scan_result.duplicate_groups|length }} group(s)</span>
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="accordion" id="duplicateAccordion">
+                    {% for group in scan_result.duplicate_groups %}
+                    <div class="accordion-item border-0 border-bottom">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed {% if not loop.first %}collapsed{% endif %}"
+                                    type="button" data-bs-toggle="collapse"
+                                    data-bs-target="#group{{ loop.index }}">
+                                <div class="d-flex w-100 align-items-center me-3">
+                                    <i class="bi bi-file-earmark me-2 text-primary"></i>
+                                    <span class="fw-medium flex-grow-1">
+                                        {{ group.files[0]|basename }} &amp; {{ group.count - 1 }} other(s)
+                                    </span>
+                                    <span class="badge bg-light text-dark me-2">{{ group.count }} files</span>
+                                    <span class="badge bg-danger-subtle text-danger">{{ group.size_display }} each</span>
+                                </div>
+                            </button>
+                        </h2>
+                        <div id="group{{ loop.index }}"
+                             class="accordion-collapse collapse {% if loop.first %}show{% endif %}"
+                             data-bs-parent="#duplicateAccordion">
+                            <div class="accordion-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 60px;">#</th>
+                                                <th>File Name</th>
+                                                <th>Folder</th>
+                                                <th>Size</th>
+                                                <th>Status</th>
+                                                <th style="width: 120px;">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for file_path in group.files %}
+                                            <tr>
+                                                <td>{{ loop.index }}</td>
+                                                <td>
+                                                    <i class="bi bi-file-earmark me-1 text-muted"></i>
+                                                    {{ file_path|basename }}
+                                                </td>
+                                                <td class="text-muted small">{{ file_path|dirname }}</td>
+                                                <td>{{ group.size_display }}</td>
+                                                <td>
+                                                    {% if loop.first %}
+                                                    <span class="badge bg-success-subtle text-success">
+                                                        <i class="bi bi-check-circle me-1"></i>Original
+                                                    </span>
+                                                    {% else %}
+                                                    <span class="badge bg-warning-subtle text-warning">
+                                                        <i class="bi bi-copy me-1"></i>Duplicate
+                                                    </span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if not loop.first %}
+                                                    <button class="btn btn-sm btn-outline-danger delete-duplicate"
+                                                            data-file-path="{{ file_path }}"
+                                                            data-file-name="{{ file_path|basename }}">
+                                                        <i class="bi bi-trash me-1"></i>Delete
+                                                    </button>
+                                                    {% else %}
+                                                    <span class="text-muted small">Kept</span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="p-3 bg-light border-top">
+                                    <small class="text-muted">
+                                        <i class="bi bi-hdd me-1"></i>
+                                        <strong>Hash:</strong> <code>{{ group.hash[:16] }}...</code>
+                                        &nbsp;|&nbsp;
+                                        <i class="bi bi-trash me-1"></i>
+                                        Can free: <strong class="text-danger">{{ group.space_saved_display }}</strong>
+                                        by deleting {{ group.duplicates|length }} duplicate(s)
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    <section id="about" class="mb-5">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3">
+                <h5 class="mb-0 fw-semibold">
+                    <i class="bi bi-info-circle me-2 text-primary"></i>About This Project
+                </h5>
+            </div>
+            <div class="card-body p-4">
+                <div class="row g-4">
+                    <div class="col-lg-6">
+                        <h6 class="fw-semibold text-primary"><i class="bi bi-exclamation-circle me-2"></i>Problem</h6>
+                        <p class="text-muted">
+                            Over time, computers accumulate duplicate files — the same photos, documents, music,
+                            and downloads scattered across different folders. These duplicates waste valuable
+                            disk space and make file management harder.
+                        </p>
+
+                        <h6 class="fw-semibold text-primary mt-4"><i class="bi bi-check-circle me-2"></i>Solution</h6>
+                        <p class="text-muted">
+                            Smart File Duplicate Detector scans any folder on your computer, computes SHA-256
+                            hashes for every file, and identifies exact duplicates. It groups duplicate files
+                            together, shows you how much space can be saved, and lets you delete extra copies
+                            with a single click.
+                        </p>
+                    </div>
+                    <div class="col-lg-6">
+                        <h6 class="fw-semibold text-primary"><i class="bi bi-gear me-2"></i>How It Works</h6>
+                        <ol class="text-muted">
+                            <li class="mb-2"><strong>Select a folder</strong> — Enter any folder path on your computer.</li>
+                            <li class="mb-2"><strong>Hashing</strong> — Each file is read in 64 KB chunks and a SHA-256 hash is computed.</li>
+                            <li class="mb-2"><strong>Compare</strong> — Files with identical hashes are exact duplicates.</li>
+                            <li class="mb-2"><strong>Review</strong> — Duplicate groups are displayed with file names, sizes, and locations.</li>
+                            <li class="mb-2"><strong>Clean up</strong> — Delete unwanted duplicates and free up disk space.</li>
+                        </ol>
+
+                        <h6 class="fw-semibold text-primary mt-4"><i class="bi bi-stack me-2"></i>Technology Stack</h6>
+                        <div class="d-flex flex-wrap gap-2">
+                            <span class="badge bg-primary">Python</span>
+                            <span class="badge bg-success">Flask</span>
+                            <span class="badge bg-info text-dark">MySQL</span>
+                            <span class="badge bg-warning text-dark">SHA-256</span>
+                            <span class="badge bg-danger">Bootstrap 5</span>
+                            <span class="badge bg-secondary">JavaScript</span>
+                            <span class="badge bg-dark">HTML5/CSS3</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-semibold">
+                    <i class="bi bi-exclamation-triangle text-danger me-2"></i>Confirm Delete
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <i class="bi bi-trash text-danger" style="font-size: 3rem;"></i>
+                <p class="mt-3 mb-1 fw-medium">Are you sure you want to delete this duplicate file?</p>
+                <p class="text-muted mb-0 small" id="deleteFileName">filename.ext</p>
+                <p class="text-muted small mt-2">
+                    <i class="bi bi-info-circle me-1"></i>The original file will be kept.
+                </p>
+            </div>
+            <div class="modal-footer border-0 justify-content-center">
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger px-4" id="confirmDelete">
+                    <i class="bi bi-trash me-1"></i>Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<input type="hidden" id="deleteUrl" value="{{ url_for('delete_duplicate') }}">
+
+{% endblock %}
